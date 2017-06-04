@@ -66,7 +66,7 @@ The GPIO controller ATmega32U4 has the following connections:
 | PE6 | in+  | Remote Green LED |
 | PB4 | in+  | Remote Red LED |
 | PD3 | tx   | UI serial tx |
-| PD3 | rx   | UI serial rx |
+| PD2 | rx   | UI serial rx |
 | PB0 | out+ | Internal rx LED |
 | PD5 | out+ | Internal tx LED |
 

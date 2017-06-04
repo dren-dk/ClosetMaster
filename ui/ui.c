@@ -117,7 +117,7 @@ void lcdInit() {
 void lcdHello(char frame) {  
   if (frame & 4) {
     lcd_gotoxy(0,0);
-    lcd_puts_p(PSTR("  1 kW Kuffert  "));
+    lcd_puts_p(PSTR("   Closet Ctrl  "));
 
   } else {
     lcd_gotoxy(0,1);
@@ -254,7 +254,7 @@ void handleMenu() {
     } else if (ch == 'o') {
       menu = 7;
 
-    } else if (ch == 'q') {
+    } else {
       menu = 0;
     }
 
@@ -491,7 +491,7 @@ int main(void) {
     }
 
     uint8_t buttons = readButtons();
-    if (polly++ > 200) {
+    if (polly++ > 500) {
       polly=0;
     }
 
