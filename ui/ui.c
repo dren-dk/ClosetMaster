@@ -423,7 +423,6 @@ ISR(USART_RX_vect) {
   }
 }
 
-
 int main(void) {
   wdt_enable(WDTO_4S);
   statusLED(1);

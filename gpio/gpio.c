@@ -78,6 +78,7 @@ void frontLCD(const char *fmt, ...) {
 }
 
 typedef struct UIState {
+  uint8_t seq;
   uint16_t voltage;
   uint16_t current;
   uint8_t buttons;
@@ -86,10 +87,11 @@ typedef struct UIState {
 struct UIState uiState;
 
 void handleLine(char *line) {
-  uint16_t voltage;
-  uint16_t current;
-  uint8_t buttons;
-  if (sscanf_P(PSTR("%d %d %d"), line, &voltage, &current, &buttons) == 3) {
+  uint16_t voltage = 42;
+  uint16_t current = 43;
+  uint8_t buttons = 44;
+  if (sscanf_P(line, PSTR("%d %d %hhd"), &voltage, &current, &buttons) == 3) {
+    uiState.seq++;
     uiState.voltage = voltage;
     uiState.current = current;
     uiState.buttons = buttons;
@@ -98,10 +100,51 @@ void handleLine(char *line) {
 
 void getUIState(UIState *uis) {
   cli();
-  memcpy(uis, &uiState, sizeof(uiState));
+  memcpy(uis, &uiState, sizeof(UIState));
   sei();
 }
 
+void initGPIO() {
+  //| PC6 | out+ | Remote Home-lock |
+  DDRC |= _BV(PC6);
+  
+  //| PD4 | out+ | Remote Out-lock |
+  //| PD7 | out+ | Remote Unlock all |
+  DDRD |= _BV(PD4) | _BV(PD7);
+
+  // | PF7 | out+ | Outdoor beeper |
+  DDRF |= _BV(PF7);
+
+  // Pullups for the doors
+  PORTF |= _BV(PF4) | _BV(PF5) | _BV(PF6);
+}
+
+#define DOOR_BACK_LOCK 1
+#define DOOR_FRONT_LOCK 2
+#define DOOR_BELL 3
+
+uint8_t readDoors() {
+  return (PINF & (_BV(PF4) | _BV(PF5) | _BV(PF6))) >> 4;
+}  
+
+#define LED_GREEN 1
+#define LED_RED 1
+
+uint8_t readRemote() {
+  
+  //| PE6 | in+  | Remote Green LED |
+  //| PB4 | in+  | Remote Red LED |
+  uint8_t r = 0;
+  if (PINE & _BV(PE6)) {
+    r |= LED_GREEN;
+  }
+
+  if (PINB & _BV(PB4)) {
+    r |= LED_RED;
+  }
+
+  return r;
+}
 
 #define MAX_BUF 32
 char buf[MAX_BUF];
@@ -115,6 +158,8 @@ ISR(USART1_RX_vect) {
 
   if (ch == '\r') {
     handleLine(buf);
+    bufLen = 0;
+    buf[bufLen] = 0;
     
   } else if (ch == '\n') {
     // Ignore.
@@ -122,8 +167,9 @@ ISR(USART1_RX_vect) {
   } else {
     if (bufLen > MAX_BUF) {
       bufLen = 0;
+    } else {
+      buf[bufLen++] = ch;
     }
-    buf[bufLen++] = ch;
     buf[bufLen] = 0;
   }
 }
@@ -133,6 +179,8 @@ int main(void) {
   USB_Init();
   Serial_Init(115200, false);
 
+  initGPIO();
+  
   // Enable RX interrupts
   sei();
   UCSR1B |= (1 << RXCIE1);
@@ -164,6 +212,18 @@ int main(void) {
       frontLED(leds);
       frontLCD(PSTR("%32d"), leds);
       loopy = 0;
+     
+      if (!(leds & 7)) {
+	UIState uis;
+	getUIState(&uis);
+	uint8_t ds = readDoors();
+      
+	fprintf(&USBSerialStream, "%d: %d mV\t%d mA\t%d\t%d\r\n",
+		uis.seq,
+		uis.voltage, uis.current, uis.buttons,
+		ds);
+
+      }
     }
         
     int16_t ch = CDC_Device_ReceiveByte(&VirtualSerial_CDC_Interface);
